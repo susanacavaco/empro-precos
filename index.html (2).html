@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EMPRO — Gestão de Preços 2026</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#f6f6f7;color:#1a1a2e;font-size:13px}
+.app{display:flex;min-height:100vh}
+.sb{width:190px;background:#0F1B2D;display:flex;flex-direction:column;flex-shrink:0;position:fixed;top:0;left:0;height:100vh;z-index:10}
+.main{margin-left:190px;flex:1;display:flex;flex-direction:column;min-height:100vh}
+.logo{padding:14px 14px 12px;border-bottom:1px solid #1e3050}
+.logo-t{color:#F59E0B;font-weight:700;font-size:15px}
+.logo-s{color:#4a6080;font-size:10px;margin-top:2px}
+.ns{color:#4a6080;font-size:9px;font-weight:700;letter-spacing:1px;padding:12px 14px 4px;text-transform:uppercase}
+.ni{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;color:#8899aa;border-left:3px solid transparent;font-size:12px}
+.ni:hover{color:#F59E0B}
+.ni.on{color:#F59E0B;background:rgba(245,158,11,0.08);border-left-color:#F59E0B;font-weight:600}
+
+/* Top bar */
+.topbar{background:#fff;border-bottom:1px solid #e1e3e5;padding:10px 20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:5}
+.topbar-title{font-size:14px;font-weight:600;color:#1a1a2e;margin-right:8px}
+.topbar-count{font-size:12px;color:#6b7280;background:#f3f4f6;padding:3px 8px;border-radius:4px}
+
+/* Spreadsheet */
+.sheet-wrap{overflow:auto;flex:1}
+.sheet{border-collapse:collapse;width:max-content;min-width:100%}
+.sheet thead tr{background:#f6f6f7;position:sticky;top:0;z-index:4}
+.sheet th{padding:8px 10px;text-align:left;font-size:11px;font-weight:600;color:#6b7280;border-right:1px solid #e1e3e5;border-bottom:2px solid #c9cccf;white-space:nowrap;user-select:none}
+.sheet th:first-child{border-left:none}
+.sheet td{padding:0;border-right:1px solid #e1e3e5;border-bottom:1px solid #e1e3e5;background:#fff;vertical-align:middle;position:relative}
+.sheet td:first-child{border-left:none}
+.sheet tr:hover td{background:#f9fafb}
+.sheet tr.aR td{background:#fff5f5}
+.sheet tr.aR:hover td{background:#fee2e2}
+
+/* Cell content */
+.cell{padding:7px 10px;display:block;font-size:12px;color:#1a1a2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;min-height:34px;line-height:20px}
+.cell.num{text-align:right;font-variant-numeric:tabular-nums}
+.cell.code{font-family:monospace;font-size:10px;color:#6b7280}
+.cell.bold{font-weight:600}
+.cell.purple{color:#7c3aed;font-weight:600}
+
+/* Editable cell */
+.cell-edit{background:transparent;border:none;outline:none;width:100%;font-family:inherit;font-size:12px;color:#1a1a2e;padding:7px 10px;text-align:right;display:block;min-height:34px}
+td.editing{outline:2px solid #F59E0B;outline-offset:-1px;background:#fffbeb!important;z-index:3}
+td.editing:hover{background:#fffbeb!important}
+
+/* Badges */
+.badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600}
+.badge-G{background:#e3f1df;color:#1e7e34}
+.badge-R{background:#fce8e8;color:#c0392b}
+.badge-A{background:#fef9e7;color:#b7770d}
+
+/* Filters bar */
+.fbar{background:#fff;border-bottom:1px solid #e1e3e5;padding:8px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+input[type=text],input[type=password],select{border:1px solid #c9cccf;border-radius:6px;padding:5px 9px;font-size:12px;background:#fff;color:#1a1a2e;outline:none;font-family:inherit;height:32px}
+input[type=text]:focus,select:focus{border-color:#F59E0B;box-shadow:0 0 0 2px rgba(245,158,11,0.15)}
+.btn{border:1px solid #c9cccf;border-radius:6px;padding:5px 12px;font-size:12px;cursor:pointer;background:#fff;color:#374151;font-family:inherit;height:32px;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{background:#f3f4f6}
+.bp{background:#F59E0B;border-color:#F59E0B;color:#0F1B2D;font-weight:600}
+.bp:hover{background:#e8930a}
+.bd{background:#DC2626;border-color:#DC2626;color:#fff}
+
+/* Stats row */
+.stats{display:flex;gap:1px;background:#e1e3e5;border-bottom:2px solid #c9cccf}
+.stat-cell{background:#f6f6f7;padding:8px 16px;flex:1;min-width:120px}
+.stat-val{font-size:18px;font-weight:700;line-height:1}
+.stat-lbl{font-size:10px;color:#6b7280;margin-top:2px}
+
+/* Card */
+.card{background:#fff;border-radius:8px;padding:18px;margin:16px;border:1px solid #e1e3e5}
+
+/* Login */
+.lw{min-height:100vh;background:#0F1B2D;display:flex;align-items:center;justify-content:center}
+.rb{background:#1a2d45;border:1px solid #1e3a54;border-radius:8px;padding:12px 16px;cursor:pointer;text-align:left;display:flex;align-items:center;gap:12px;width:100%;margin-bottom:9px;font-family:inherit}
+.rb:hover{border-color:#F59E0B}
+.uz{border:2px dashed #c9cccf;border-radius:8px;padding:28px;text-align:center;cursor:pointer}
+.uz:hover{border-color:#F59E0B;background:#fffbeb}
+
+/* Drag handle */
+.dh{width:10px;cursor:ns-resize;position:absolute;right:3px;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:2px;opacity:0.5}
+.dh span{display:block;width:8px;height:1.5px;background:#666;border-radius:1px}
+td:hover .dh,.dh:hover{display:flex;opacity:1}
+.drag-target td{background:#fffbeb!important;outline:2px solid #F59E0B}
+.drag-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize}
+
+/* Vbar vendor */
+.vbar{background:#0F1B2D;padding:10px 18px;display:flex;align-items:center;justify-content:space-between}
+@media print{.np{display:none!important}.vbar{position:static}}
+
+/* Progress */
+.prog-wrap{display:none;margin-top:12px}
+.prog-bar{height:5px;background:#e1e3e5;border-radius:3px}
+.prog-fill{height:5px;background:#F59E0B;border-radius:3px;width:0%;transition:width 0.3s}
+
+/* Frozen col */
+.sheet td:nth-child(1),.sheet th:nth-child(1){position:sticky;left:0;z-index:2;background:#fff}
+.sheet thead th:nth-child(1){z-index:5;background:#f6f6f7}
+.sheet tr:hover td:nth-child(1){background:#f9fafb}
+.sheet tr.aR td:nth-child(1){background:#fff5f5}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+var AP="empro2026",VP="vendas2026";
+function pvpC(c,a,m){var b=a>0?a:c;if(!b||!m)return 0;return Math.round(b*(1+m)*1.175*100)/100}
+function pvpG(a){var b=a.pa>0?a.pa:a.pc;if(!b)return 0;var mk=a.mk5||0;if(!mk)return Math.round(pvpC(a.pc,a.pa,a.mk)*0.80*100)/100;var r=b*(1+mk)*(1+a.iv/100);return Math.floor(r*10)/10+0.09}
+function mgC(p,c){return p>0&&c>0?(p-c)/p:0}
+function phC(p){return Math.round(p*0.85*100)/100}
+function pgC(p){return Math.round(p*0.80*100)/100}
+function pct(v){return(v*100).toFixed(1)+"%"}
+function mkP(v){return Math.round(v*1000)/10}
+function eu(v){return v>0?"€"+v.toFixed(2):"—"}
+function nv(v){if(typeof v==="number")return v;return parseFloat(String(v||"").replace(",","."))||0}
+function esc(s){return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+
+var DEMO=[
+  {a:"01010003",d:"PEDRAS SALGADAS 0,25 LT TP",f:"EDUARDO & GONCALVES LDA.",fa:"Águas",cb:"5601195110021",ma:"PEDRAS SALGADAS",mo:"",pc:0.40,pa:0,mk:0.34,mk5:0.40,iv:13,p1:0.63},
+  {a:"01010005",d:"AGUA CARVALHELHOS COM GAS TP 1 LT",f:"AGUAS DE CARVALHELHOS, S.A.",fa:"Águas",cb:"5601405000203",ma:"CARVALHELHOS",mo:"",pc:0.98,pa:0,mk:0.398,mk5:0.42,iv:13,p1:1.61},
+  {a:"01010045",d:"FEVER TREE TONICA INDIAN PREMIUM 0,20LT",f:"VIRIATHUS DRINKS, LDA.",fa:"Refrigerantes",cb:"5060108450010",ma:"FEVER TREE",mo:"",pc:0.79,pa:0,mk:0.25,mk5:0.30,iv:23,p1:1.16},
+  {a:"01010080",d:"AGUA SOLAN DE CABRAS C/GAS 0,33 LT TP",f:"MAHOU S.A. - SUCURSAL EM PORTUGAL",fa:"Águas",cb:"8411547213099",ma:"SOLAN DE CABRAS",mo:"",pc:0.716,pa:0,mk:0.50,mk5:0.55,iv:13,p1:1.26},
+  {a:"02010037",d:"MARQUES DE BORBA TINTO 0,75 LT",f:"EMPOR SPIRITS, SA",fa:"Vinhos",cb:"5604135003032",ma:"JOAO PORTUGAL RAMOS",mo:"MARQUES DE BORBA",pc:3.976,pa:3.98,mk:0.249,mk5:0.30,iv:13,p1:5.84},
+  {a:"02010087",d:"LOIOS TINTO 0,75 LT",f:"EMPOR SPIRITS, SA",fa:"Vinhos",cb:"5604135001144",ma:"JOAO PORTUGAL RAMOS",mo:"LOIOS",pc:2.4779,pa:2.48,mk:0.249,mk5:0.30,iv:13,p1:3.64},
+  {a:"02010091",d:"V PAPA FIGOS TINTO 0,75 LT",f:"SOGRAPE DISTRIBUIÇÃO, S.A.",fa:"Vinhos",cb:"5601012002706",ma:"CASA FERREIRINHA",mo:"PAPA FIGOS",pc:5.04,pa:5.04,mk:0.18,mk5:0.25,iv:13,p1:6.99},
+  {a:"02010242",d:"V CALLABRIGA TINTO 0,75 LT",f:"SOGRAPE DISTRIBUIÇÃO, S.A.",fa:"Vinhos",cb:"5601007478509",ma:"CASA FERREIRINHA",mo:"CALLABRIGA",pc:12.1875,pa:12.19,mk:0.18,mk5:0.22,iv:13,p1:16.90},
+  {a:"02011009",d:"V ESTEVA TINTO 0,75 LT",f:"SOGRAPE DISTRIBUIÇÃO, S.A.",fa:"Vinhos",cb:"5601007001332",ma:"CASA FERREIRINHA",mo:"ESTEVA",pc:3.2917,pa:0,mk:0.171,mk5:0.22,iv:13,p1:4.53},
+  {a:"02011288",d:"V BARCA VELHA 2011 TINTO 0,75 LT",f:"SOGRAPE DISTRIBUIÇÃO, S.A.",fa:"Vinhos",cb:"5601007002131",ma:"CASA FERREIRINHA",mo:"BARCA VELHA",pc:285.0,pa:0,mk:0.471,mk5:0.50,iv:13,p1:492.44},
+  {a:"02010049",d:"V GALITOS TINTO 0,75 LT",f:"ADEGA COOPERATIVA DE BORBA",fa:"Vinhos",cb:"5602154152441",ma:"ADEGA DE BORBA",mo:"GALITOS",pc:1.3232,pa:1.32,mk:0.303,mk5:0.35,iv:13,p1:2.02},
+  {a:"02010052",d:"V MONTES CLAROS RESERVA TINTO 0,75 LT",f:"ADEGA COOPERATIVA DE BORBA",fa:"Vinhos",cb:"5602154662476",ma:"ADEGA DE BORBA",mo:"MONTES CLAROS",pc:4.9845,pa:4.98,mk:0.301,mk5:0.35,iv:13,p1:7.61},
+  {a:"02010061",d:"CARTUXA COLHEITA TINTO 0,75 LT",f:"HERITAGE WINES",fa:"Vinhos",cb:"5602720040042",ma:"CARTUXA",mo:"",pc:14.50,pa:14.50,mk:0.334,mk5:0.38,iv:13,p1:22.73},
+  {a:"02011099",d:"DISCORDIA COLHEITA TINTO 0,75 LT",f:"EDUAL - SOC. AGRICOLA DO GUADIANA, S.A",fa:"Vinhos",cb:"5600878790048",ma:"DISCORDIA",mo:"",pc:5.69,pa:0,mk:0.30,mk5:0.35,iv:13,p1:8.69},
+  {a:"02010750",d:"V. CONTOS DA TERRA TINTO 0,75 LT",f:"QUINTA DO POPA, LDA",fa:"Vinhos",cb:"5600312475043",ma:"QUINTA DO POPA",mo:"CONTOS DA TERRA",pc:3.43,pa:0,mk:0.35,mk5:0.40,iv:13,p1:5.44}
+];
+
+var S={
+  role:null,step:null,tab:"importar",
+  arts:JSON.parse(JSON.stringify(DEMO)),sn:{},isDemo:true,
+  srch:"",fF:"Todos",fMa:"Todas",fMo:"Todos",only:false,page:0,
+  gSrch:"",gForn:"Todos",gMarca:"Todas",gModelo:"Todos",gPage:0,
+  vF:"Todos",vMa:"Todas",vMo:"Todos",vH:true,vG:true,
+  importLog:null,matchData:null,unmatch:[],fornH:[],fornRaw:null,
+  fColB:"",fColD:"",fColP:"",fornOk:false
+};
+var PER=50;
+
+function re(){var el=document.getElementById("root");if(!S.role){el.innerHTML=lHTML();return}if(S.role==="vendor"){el.innerHTML=vHTML();return}el.innerHTML=adminHTML()}
+
+function srtL(arr,ph){var o=[ph];arr.forEach(function(x){if(x&&o.indexOf(x)<0)o.push(x)});return o.sort(function(a,b){return a===ph?-1:b===ph?1:a.localeCompare(b)})}
+function selO(list,cur){return list.map(function(x){return"<option"+(x===cur?" selected":"")+">"+esc(x)+"</option>"}).join("")}
+
+// ── LOGIN ──────────────────────────────────────────────────
+function lHTML(){
+  if(!S.step)return'<div class="lw"><div style="width:340px"><div style="text-align:center;margin-bottom:28px"><div style="color:#F59E0B;font-weight:700;font-size:26px">EMPRO</div><div style="color:#4a6080;font-size:12px;margin-top:4px">Gestão de Preços · 2026</div></div><div style="color:#8899aa;font-size:12px;text-align:center;margin-bottom:12px">Selecciona o teu perfil</div><button class="rb" onclick="goS(\'admin\')"><span style="font-size:22px">⚙️</span><div><div style="color:#e2e8f0;font-weight:600;font-size:14px">Administração</div><div style="color:#4a6080;font-size:12px;margin-top:2px">Gerir preços, markups e importações</div></div></button><button class="rb" onclick="goS(\'vendor\')"><span style="font-size:22px">👤</span><div><div style="color:#e2e8f0;font-weight:600;font-size:14px">Vendedor</div><div style="color:#4a6080;font-size:12px;margin-top:2px">Consultar e exportar tabelas de preços</div></div></button></div></div>';
+  return'<div class="lw"><div style="width:340px"><div style="text-align:center;margin-bottom:28px"><div style="color:#F59E0B;font-weight:700;font-size:26px">EMPRO</div><div style="color:#4a6080;font-size:12px;margin-top:4px">Gestão de Preços · 2026</div></div><div style="background:#1a2d45;border-radius:12px;padding:26px;border:1px solid #1e3a54"><button onclick="goS(null)" style="background:none;border:none;color:#4a6080;cursor:pointer;font-size:12px;margin-bottom:14px;padding:0;font-family:inherit">← Voltar</button><div style="color:#e2e8f0;font-weight:600;font-size:14px;margin-bottom:14px">'+(S.step==="admin"?"⚙️ Administração":"👤 Vendedor")+'</div><input type="password" id="pi" placeholder="Password" onkeydown="if(event.key===\'Enter\')tL()" style="border:1px solid #1e3a54;border-radius:7px;padding:8px 11px;font-size:13px;background:#0F1B2D;color:#e2e8f0;width:100%;outline:none;margin-bottom:10px;font-family:inherit"><div id="pe" style="color:#EF4444;font-size:11px;margin-bottom:8px;display:none">Password incorrecta.</div><button class="btn bp" onclick="tL()" style="width:100%;padding:9px 0;font-size:13px;justify-content:center">Entrar</button><div style="margin-top:12px;font-size:11px;color:#4a6080;text-align:center">Password: '+(S.step==="admin"?"empro2026":"vendas2026")+'</div></div></div></div>';
+}
+function goS(r){S.step=r;re()}
+function tL(){var v=(document.getElementById("pi")||{}).value||"";if(v===(S.step==="admin"?AP:VP)){S.role=S.step;re()}else{var e=document.getElementById("pe");if(e)e.style.display="block"}}
+
+// ── ADMIN SHELL ────────────────────────────────────────────
+function adminHTML(){
+  var tabs=[["importar","📋","Importar Tabela"],["conf","📊","Conferência"],["garraf","🍷","Garrafeira"],["prim","📥","Primavera"],["forn","📤","Fornecedor"]];
+  var sb='<div class="sb"><div class="logo"><div class="logo-t">EMPRO</div><div class="logo-s">Gestão de Preços 2026</div></div><div style="flex:1;overflow-y:auto"><div class="ns">Administração</div>';
+  tabs.forEach(function(t){sb+='<div class="ni'+(S.tab===t[0]?" on":"")+'\" onclick="st(\''+t[0]+'\')">'+t[1]+" "+t[2]+"</div>"});
+  sb+='<div class="ns" style="margin-top:10px">Acesso</div><div class="ni" onclick="S.role=\'vendor\';re()">👤 Ver como Vendedor</div></div>';
+  sb+='<div style="padding:0 12px 16px"><div style="font-size:10px;color:#4a6080;text-align:center;margin-bottom:8px;padding:6px;background:#1a2d45;border-radius:6px">'+(S.isDemo?"⚠️ Demonstração":"✅ "+S.arts.length+" artigos")+'</div><button class="btn" onclick="S.role=null;S.step=null;re()" style="width:100%;color:#4a6080;border-color:#1e3050;background:transparent;font-size:11px">Sair</button></div></div>';
+  var TITLES={importar:"📋 Importar Tabela",conf:"📊 Conferência de Preços",garraf:"🍷 Garrafeira",prim:"📥 Actualizar Primavera",forn:"📤 Tabela Fornecedor"};
+  var content;
+  if(S.tab==="importar")content=importarHTML();
+  else if(S.tab==="conf")content=confHTML();
+  else if(S.tab==="garraf")content=garrafHTML();
+  else if(S.tab==="prim")content=primHTML();
+  else content=fornHTML();
+  return'<div class="app">'+sb+'<div class="main">'+content+'</div></div>';
+}
+function st(t){S.tab=t;S.page=0;S.gPage=0;re()}
+
+// ── IMPORTAR ───────────────────────────────────────────────
+function importarHTML(){
+  if(!S.isDemo)return'<div class="card" style="margin:16px;border-color:#86EFAC;background:#F0FDF4"><div style="display:flex;justify-content:space-between;align-items:center"><div><div style="font-weight:700;color:#16A34A;font-size:15px">✅ Tabela carregada!</div><div style="font-size:12px;color:#15803D;margin-top:3px">'+S.arts.length+' artigos · '+S.arts.filter(function(a){return a.pc>0}).length+' com preço · '+S.arts.filter(function(a){return a.pa>0}).length+' com preço acordado</div>'+(S.importLog?'<div style="font-size:10px;color:#15803D;margin-top:6px">'+esc(S.importLog)+'</div>':'')+'</div><button class="btn bp" onclick="st(\'conf\')">→ Conferência</button></div></div><div class="card" style="margin:0 16px 16px"><div style="font-weight:600;margin-bottom:10px">🔄 Actualizar com nova versão</div><div class="uz" onclick="document.getElementById(\'f2\').click()"><div style="font-size:13px;font-weight:600">Carregar nova versão do ficheiro</div><input type="file" id="f2" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="handleTbl(this)"></div></div>'+colsTable();
+  return'<div class="card" style="margin:16px"><div style="font-weight:600;font-size:14px;margin-bottom:6px">Carrega o teu ficheiro Excel EMPRO</div><div style="padding:8px 12px;background:#FFFBEB;border-radius:6px;font-size:11px;color:#92400e;margin-bottom:14px;border:1px solid #FDE68A">⚠️ Estão a ser mostrados artigos de demonstração. Importa o teu Excel para ver os artigos reais.</div><div class="uz" onclick="document.getElementById(\'f1\').click()"><div style="font-size:32px;margin-bottom:10px">📂</div><div style="font-size:14px;font-weight:600">Clica para seleccionar o ficheiro</div><div style="font-size:12px;color:#9ca3af;margin-top:4px">EMPRO_Tabela_Base_Precos_2026.xlsm · .xlsx · .xls</div><input type="file" id="f1" accept=".xlsx,.xlsm,.xls" style="display:none" onchange="handleTbl(this)"></div><div class="prog-wrap" id="pw"><div id="pm" style="font-size:12px;color:#6b7280;margin-bottom:4px">A processar...</div><div class="prog-bar"><div class="prog-fill" id="pb"></div></div></div></div>'+colsTable();
+}
+function colsTable(){
+  var rows=[["A","Artigo","Código","est"],["B","Descrição","Nome do artigo","est"],["C","Fornecedor","Filtro","est"],["D/E","Família/Subfamília","Família","est"],["F","Cód. Barras","EAN","est"],["G","Marca","Filtro","est"],["H","Modelo","Filtro","est"],["I","Últ. Preço Compra","Preço compra","prim"],["K","Preço Acordado","Fornecedor","man"],["L","Markup","Markup % Conf.","edit"],["S","Markup5","Markup % Garrafeira","edit"],["T","IVA","Taxa IVA","est"],["Y","ERP PVP1","Referência","ref"]];
+  var clr={est:"#F3F4F6;color:#6b7280",prim:"#FFFBEB;color:#D97706",man:"#EFF6FF;color:#1d4ed8",edit:"#F0FDF4;color:#16A34A",ref:"#F3F4F6;color:#6b7280"};
+  var lbl={est:"Estático",prim:"Primavera",man:"Manual",edit:"Editável",ref:"Referência"};
+  return'<div class="card" style="margin:0 16px 16px"><div style="font-weight:600;margin-bottom:12px">ℹ️ Colunas importadas</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f6f6f7"><th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e1e3e5">Col.</th><th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e1e3e5">Nome</th><th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e1e3e5">Campo</th><th style="padding:7px 10px;text-align:left;border-bottom:2px solid #e1e3e5">Tipo</th></tr></thead><tbody>'+rows.map(function(r){return'<tr><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6;font-family:monospace;color:#6b7280">'+r[0]+'</td><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6">'+r[1]+'</td><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6;color:#6b7280">'+r[2]+'</td><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6"><span class="badge" style="background:'+clr[r[3]]+'">'+lbl[r[3]]+'</span></td></tr>'}).join("")+'</tbody></table></div>';
+}
+function setP(p,m){var pw=document.getElementById("pw");if(pw)pw.style.display="block";var pb=document.getElementById("pb");if(pb)pb.style.width=p+"%";var pm=document.getElementById("pm");if(pm)pm.textContent=m}
+function handleTbl(input){
+  if(!input.files[0])return;
+  setP(10,"A ler...");
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      setP(25,"A processar Excel...");
+      var wb=XLSX.read(e.target.result,{type:"binary"});
+      var sn=null;wb.SheetNames.forEach(function(s){if(!sn&&/c.lculo|pvp|preço|tabela/i.test(s))sn=s});if(!sn)sn=wb.SheetNames[0];
+      setP(45,"A ler: "+sn);
+      var ws=wb.Sheets[sn];var raw=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+      var ds=0;for(var i=0;i<Math.min(10,raw.length);i++){if(String(raw[i][0]||"").toLowerCase()==="artigo"){ds=i+1;break}if(String(raw[i][0]||"").match(/^\d{6,}/)){ds=i;break}}
+      setP(65,"A importar...");
+      var arts=[];
+      for(var i=ds;i<raw.length;i++){var r=raw[i];if(!r[0]||String(r[0]).trim()==="")continue;var an=Number(r[0]);if(isNaN(an)||an<=0)continue;arts.push({a:String(an).padStart(8,"0"),d:String(r[1]||"").trim(),f:String(r[2]||"").trim(),fa:String(r[3]||"").trim(),sub:String(r[4]||"").trim(),cb:String(r[5]||"").trim(),ma:String(r[6]||"").trim(),mo:String(r[7]||"").trim(),pc:nv(r[8]),pa:nv(r[10]),mk:nv(r[11]),mk5:nv(r[18]),iv:nv(r[19])||23,p1:nv(r[24]),p5:nv(r[25])})}
+      setP(90,"A finalizar...");
+      if(arts.length===0){alert("Nenhum artigo encontrado.");return}
+      S.arts=arts;S.isDemo=false;S.sn={};
+      S.importLog='Sheet: "'+sn+'" · '+arts.length+' artigos · '+arts.filter(function(a){return a.pc>0}).length+' com preço · '+arts.filter(function(a){return(a.mk5||0)>0}).length+' com Markup5';
+      setP(100,"Concluído!");setTimeout(function(){S.tab="conf";re()},500);
+    }catch(err){alert("Erro: "+err.message)}
+  };reader.readAsBinaryString(input.files[0]);
+}
+
+// ── CONFERÊNCIA (spreadsheet) ──────────────────────────────
+function confHTML(){
+  var arts=S.arts;
+  var alts=arts.filter(function(a){var p=S.sn[a.a];return p&&a.pc>p});
+  var forns=srtL(arts.map(function(a){return a.f}),"Todos");
+  var fA=S.fF==="Todos"?arts:arts.filter(function(a){return a.f===S.fF});
+  var marcas=srtL(fA.map(function(a){return a.ma}),"Todas");
+  var fB=S.fMa==="Todas"?fA:fA.filter(function(a){return a.ma===S.fMa});
+  var modelos=srtL(fB.filter(function(a){return a.mo}).map(function(a){return a.mo}),"Todos");
+  var g35=arts.filter(function(a){return a.pc>0&&mgC(pvpC(a.pc,a.pa,a.mk),a.pc)>0.35}).length;
+  var rows=arts.filter(function(a){
+    var ms=!S.srch||a.d.toLowerCase().indexOf(S.srch.toLowerCase())>=0||a.a.indexOf(S.srch)>=0||a.cb.indexOf(S.srch)>=0||a.ma.toLowerCase().indexOf(S.srch.toLowerCase())>=0;
+    return ms&&(S.fF==="Todos"||a.f===S.fF)&&(S.fMa==="Todas"||a.ma===S.fMa)&&(S.fMo==="Todos"||a.mo===S.fMo)&&(!S.only||(S.sn[a.a]&&a.pc>S.sn[a.a]));
+  });
+  var pg=rows.slice(S.page*PER,(S.page+1)*PER);var maxPg=Math.ceil(rows.length/PER);
+
+  var stats='<div class="stats"><div class="stat-cell"><div class="stat-val">'+arts.length+'</div><div class="stat-lbl">Total artigos</div></div><div class="stat-cell"><div class="stat-val" style="color:#DC2626">'+alts.length+'</div><div class="stat-lbl">Subidas de preço</div></div><div class="stat-cell"><div class="stat-val" style="color:#D97706">'+arts.filter(function(a){return a.pa>0}).length+'</div><div class="stat-lbl">Preço acordado</div></div><div class="stat-cell"><div class="stat-val" style="color:#16A34A">'+g35+'</div><div class="stat-lbl">Margem &gt; 35%</div></div></div>';
+
+  var fbar='<div class="fbar np">'+
+    (S.isDemo?'<span style="font-size:11px;color:#92400e;background:#FFFBEB;padding:4px 10px;border-radius:4px;border:1px solid #FDE68A">⚠️ Demo — <a href="#" onclick="st(\'importar\');return false" style="color:#92400e;font-weight:600">importar Excel</a></span>':'')+
+    '<input type="text" placeholder="🔍 Pesquisar..." value="'+esc(S.srch)+'" oninput="S.srch=this.value;S.page=0;re()" style="width:220px">'+
+    '<select onchange="S.fF=this.value;S.fMa=\'Todas\';S.fMo=\'Todos\';S.page=0;re()" style="max-width:170px">'+selO(forns,S.fF)+'</select>'+
+    '<select onchange="S.fMa=this.value;S.fMo=\'Todos\';S.page=0;re()" style="max-width:140px">'+selO(marcas,S.fMa)+'</select>'+
+    (modelos.length>1?'<select onchange="S.fMo=this.value;S.page=0;re()" style="max-width:130px">'+selO(modelos,S.fMo)+'</select>':'')+
+    '<button class="btn'+(S.only?" bd":"")+'" onclick="S.only=!S.only;S.page=0;re()">'+(S.only?"⚠️ Só alertas":"Todos")+'</button>'+
+    '<span style="margin-left:auto;font-size:11px;color:#6b7280">'+rows.length+' artigos</span>'+
+    (maxPg>1?'<div style="display:flex;align-items:center;gap:6px"><button class="btn" onclick="if(S.page>0){S.page--;re()}" '+(S.page===0?"disabled":"")+'>←</button><span style="font-size:12px">'+( S.page+1)+'/'+maxPg+'</span><button class="btn" onclick="if(S.page<'+(maxPg-1)+'){S.page++;re()}" '+(S.page>=maxPg-1?"disabled":"")+'>→</button></div>':'')+
+    '</div>';
+
+  var trs=pg.map(function(a){
+    var prev=S.sn[a.a],isA=prev&&a.pc>prev;
+    var d=prev?((a.pc-prev)/prev*100):null;
+    var p=pvpC(a.pc,a.pa,a.mk),m=mgC(p,a.pc);
+    var ed=a.p1>0&&p>0?((p-a.p1)/a.p1*100):null;
+    var mBadge=m>0.35?"badge-G":m>0.25?"badge-A":"badge-R";
+    return'<tr class="'+(isA?"aR":"")+'\" data-art="'+a.a+'">'+
+      '<td><span class="cell code">'+a.a+'</span></td>'+
+      '<td><span class="cell" style="max-width:220px" title="'+esc(a.d)+'">'+esc(a.d)+'</span></td>'+
+      '<td><span class="cell" style="max-width:150px;color:#6b7280" title="'+esc(a.f)+'">'+esc(a.f||"—")+'</span></td>'+
+      '<td><span class="cell" style="max-width:130px" title="'+esc(a.ma)+'">'+esc(a.ma||"—")+'</span></td>'+
+      '<td><span class="cell" style="max-width:110px;color:#6b7280">'+esc(a.mo||"—")+'</span></td>'+
+      '<td><span class="cell num">'+(prev?eu(prev):"—")+'</span></td>'+
+      '<td><span class="cell num bold">'+(a.pc>0?eu(a.pc):'<span style="color:#9ca3af">sem preço</span>')+'</span></td>'+
+      '<td><span class="cell num">'+(d!==null?'<span class="badge '+(d>0?"badge-R":"badge-G")+'">'+(d>0?"▲":"▼")+Math.abs(d).toFixed(1)+'%</span>':"—")+'</span></td>'+
+      '<td style="min-width:100px" onclick="startEdit(this,\'mk\',\''+a.a+'\')" title="Clica para editar"><div style="display:flex;align-items:center;gap:4px;padding:7px 10px"><span style="font-size:12px;color:#1a1a2e;font-variant-numeric:tabular-nums">'+mkP(a.mk)+'</span><span style="font-size:10px;color:#6b7280">%</span><div class="dh" data-type="mk"><span></span><span></span><span></span></div></div></td>'+
+      '<td><span class="cell num bold">'+(a.pc>0?eu(p):"—")+'</span></td>'+
+      '<td><span class="cell num">'+(a.pc>0?'<span class="badge '+mBadge+'">'+pct(m)+'</span>':"—")+'</span></td>'+
+      '<td><span class="cell num">'+(a.pc>0?eu(phC(p)):"—")+'</span></td>'+
+      '<td><span class="cell num">'+(a.pc>0?eu(pgC(p)):"—")+'</span></td>'+
+      '<td><span class="cell num" style="color:'+(ed!==null&&Math.abs(ed)>5?(ed>0?"#DC2626":"#16A34A"):"#6b7280")+'">'+(a.p1>0?eu(a.p1)+(ed!==null&&Math.abs(ed)>5?' <small>'+(ed>0?"▲":"▼")+Math.abs(ed).toFixed(0)+'%</small>':""):"—")+'</span></td>'+
+      '</tr>';
+  }).join("");
+
+  return stats+fbar+
+    '<div class="sheet-wrap"><table class="sheet">'+
+    '<thead><tr>'+
+    '<th style="min-width:90px">Artigo</th><th style="min-width:220px">Descrição</th><th style="min-width:150px">Fornecedor</th><th style="min-width:130px">Marca</th><th style="min-width:110px">Modelo</th>'+
+    '<th style="min-width:85px;text-align:right">Pr. Ant.</th><th style="min-width:90px;text-align:right">Pr. Compra</th><th style="min-width:75px;text-align:right">Δ</th>'+
+    '<th style="min-width:100px;text-align:right">Markup %<span style="font-size:9px;color:#F59E0B;margin-left:4px">✏️ clica</span></th>'+
+    '<th style="min-width:90px;text-align:right">PVP</th><th style="min-width:80px;text-align:right">Margem</th><th style="min-width:85px;text-align:right">Horeca</th><th style="min-width:90px;text-align:right">Garrafeira</th><th style="min-width:90px;text-align:right">ERP PVP1</th>'+
+    '</tr></thead><tbody>'+trs+'</tbody></table>'+
+    (pg.length===0?'<div style="padding:40px;text-align:center;color:#9ca3af">Nenhum artigo encontrado.</div>':'')+
+    '</div>';
+}
+
+// ── GARRAFEIRA (spreadsheet) ───────────────────────────────
+function garrafHTML(){
+  var arts=S.arts.filter(function(a){return a.pc>0});
+  var forns=srtL(arts.map(function(a){return a.f}),"Todos");
+  var fA=S.gForn==="Todos"?arts:arts.filter(function(a){return a.f===S.gForn});
+  var marcas=srtL(fA.map(function(a){return a.ma}),"Todas");
+  var fB=S.gMarca==="Todas"?fA:fA.filter(function(a){return a.ma===S.gMarca});
+  var modelos=srtL(fB.filter(function(a){return a.mo}).map(function(a){return a.mo}),"Todos");
+  var rows=fB.filter(function(a){
+    var ms=!S.gSrch||a.d.toLowerCase().indexOf(S.gSrch.toLowerCase())>=0||a.a.indexOf(S.gSrch)>=0||a.ma.toLowerCase().indexOf(S.gSrch.toLowerCase())>=0;
+    return ms&&(S.gModelo==="Todos"||a.mo===S.gModelo);
+  });
+  var pg=rows.slice(S.gPage*PER,(S.gPage+1)*PER);var maxPg=Math.ceil(rows.length/PER);
+  var withG=rows.filter(function(a){return pvpG(a)>0});
+  var avgMg=withG.length>0?withG.reduce(function(s,a){var b=a.pa>0?a.pa:a.pc;return s+mgC(pvpG(a),b)},0)/withG.length:0;
+  var ab30=withG.filter(function(a){var b=a.pa>0?a.pa:a.pc;return mgC(pvpG(a),b)>0.30}).length;
+  var withMk5=S.arts.filter(function(a){return(a.mk5||0)>0}).length;
+
+  var stats='<div class="stats"><div class="stat-cell"><div class="stat-val">'+rows.length+'</div><div class="stat-lbl">Artigos filtrados</div></div><div class="stat-cell"><div class="stat-val" style="color:#7c3aed">'+withMk5+'</div><div class="stat-lbl">Com Markup5</div></div><div class="stat-cell"><div class="stat-val" style="color:#16A34A">'+ab30+'</div><div class="stat-lbl">Margem &gt; 30%</div></div><div class="stat-cell"><div class="stat-val" style="color:#0369a1">'+pct(avgMg)+'</div><div class="stat-lbl">Margem média</div></div></div>';
+
+  var fbar='<div class="fbar np">'+
+    '<input type="text" placeholder="🔍 Pesquisar..." value="'+esc(S.gSrch)+'" oninput="S.gSrch=this.value;S.gPage=0;re()" style="width:220px">'+
+    '<select onchange="S.gForn=this.value;S.gMarca=\'Todas\';S.gModelo=\'Todos\';S.gPage=0;re()" style="max-width:170px">'+selO(forns,S.gForn)+'</select>'+
+    '<select onchange="S.gMarca=this.value;S.gModelo=\'Todos\';S.gPage=0;re()" style="max-width:140px">'+selO(marcas,S.gMarca)+'</select>'+
+    (modelos.length>1?'<select onchange="S.gModelo=this.value;S.gPage=0;re()" style="max-width:130px">'+selO(modelos,S.gModelo)+'</select>':'')+
+    '<span style="margin-left:auto;font-size:11px;color:#6b7280">'+rows.length+' artigos</span>'+
+    (maxPg>1?'<div style="display:flex;align-items:center;gap:6px"><button class="btn" onclick="if(S.gPage>0){S.gPage--;re()}" '+(S.gPage===0?"disabled":"")+'>←</button><span style="font-size:12px">'+(S.gPage+1)+'/'+maxPg+'</span><button class="btn" onclick="if(S.gPage<'+(maxPg-1)+'){S.gPage++;re()}" '+(S.gPage>=maxPg-1?"disabled":"")+'>→</button></div>':'')+
+    '</div>';
+
+  var trs=pg.map(function(a){
+    var p=pvpC(a.pc,a.pa,a.mk);
+    var pG=pvpG(a);
+    var base=a.pa>0?a.pa:a.pc;
+    var mgG=mgC(pG,base);
+    var mBadge=mgG>0.30?"badge-G":mgG>0.20?"badge-A":"badge-R";
+    return'<tr data-art-g="'+a.a+'">'+
+      '<td><span class="cell code">'+a.a+'</span></td>'+
+      '<td><span class="cell" style="max-width:220px" title="'+esc(a.d)+'">'+esc(a.d)+'</span></td>'+
+      '<td><span class="cell" style="max-width:150px;color:#6b7280">'+esc(a.f||"—")+'</span></td>'+
+      '<td><span class="cell" style="max-width:130px">'+esc(a.ma||"—")+'</span></td>'+
+      '<td><span class="cell" style="max-width:110px;color:#6b7280">'+esc(a.mo||"—")+'</span></td>'+
+      '<td><span class="cell num">'+eu(a.pc)+'</span></td>'+
+      '<td><span class="cell num">'+eu(p)+'</span></td>'+
+      '<td><span class="cell num" style="color:#9ca3af">'+eu(pgC(p))+'</span></td>'+
+      '<td style="min-width:100px" onclick="startEdit(this,\'mk5\',\''+a.a+'\')" title="Clica para editar"><div style="display:flex;align-items:center;gap:4px;padding:7px 10px"><span style="font-size:12px;color:#1a1a2e;font-variant-numeric:tabular-nums">'+mkP(a.mk5||0)+'</span><span style="font-size:10px;color:#6b7280">%</span><div class="dh" data-type="mk5"><span></span><span></span><span></span></div></div></td>'+
+      '<td><span class="cell num purple">'+(pG>0?eu(pG):"—")+'</span></td>'+
+      '<td><span class="cell num">'+(pG>0?'<span class="badge '+mBadge+'">'+pct(mgG)+'</span>':"—")+'</span></td>'+
+      '</tr>';
+  }).join("");
+
+  return stats+'<div style="padding:8px 16px;background:#F5F3FF;font-size:11px;color:#5b21b6;border-bottom:1px solid #ddd6fe">🍷 <strong>PVP Garrafeira</strong> = Markup5 com arredondamento .09. Clica no Markup5 para editar directamente. Arrasta o handle ⠿ para aplicar em bloco.</div>'+fbar+
+    '<div class="sheet-wrap"><table class="sheet">'+
+    '<thead><tr>'+
+    '<th style="min-width:90px">Artigo</th><th style="min-width:220px">Descrição</th><th style="min-width:150px">Fornecedor</th><th style="min-width:130px">Marca</th><th style="min-width:110px">Modelo</th>'+
+    '<th style="min-width:90px;text-align:right">Pr. Compra</th><th style="min-width:90px;text-align:right">PVP Geral</th><th style="min-width:90px;text-align:right">PVP×80%</th>'+
+    '<th style="min-width:100px;text-align:right">Markup5 %<span style="font-size:9px;color:#F59E0B;margin-left:4px">✏️ clica</span></th>'+
+    '<th style="min-width:100px;text-align:right;color:#7c3aed">PVP Garrafeira</th><th style="min-width:80px;text-align:right">Margem</th>'+
+    '</tr></thead><tbody>'+trs+'</tbody></table>'+
+    (pg.length===0?'<div style="padding:40px;text-align:center;color:#9ca3af">Nenhum artigo.</div>':'')+
+    '</div>';
+}
+
+// ── INLINE EDIT ────────────────────────────────────────────
+function startEdit(td, type, artigo){
+  if(td.classList.contains("editing"))return;
+  td.classList.add("editing");
+  var a=S.arts.filter(function(x){return x.a===artigo})[0];if(!a)return;
+  var cur=mkP(type==="mk5"?(a.mk5||0):a.mk);
+  td.innerHTML='<input type="number" step="0.1" min="-100" max="500" value="'+cur+'" class="cell-edit" onblur="commitEdit(this,\''+type+'\',\''+artigo+'\')" onkeydown="if(event.key===\'Enter\'||event.key===\'Tab\'){event.preventDefault();commitEdit(this,\''+type+'\',\''+artigo+'\')}if(event.key===\'Escape\'){re()}">';
+  var inp=td.querySelector("input");if(inp){inp.focus();inp.select()}
+}
+function commitEdit(inp, type, artigo){
+  var v=parseFloat(inp.value)||0;
+  var a=S.arts.filter(function(x){return x.a===artigo})[0];
+  if(a){var mv=Math.round(v/100*10000)/10000;if(type==="mk5")a.mk5=mv;else a.mk=mv}
+  re();
+}
+
+// ── PRIMAVERA ──────────────────────────────────────────────
+function primHTML(){
+  var steps=[["1","Abre Artigos / Tabelas de Preços no Primavera"],["2","Clica na extensão Office (ícone Excel)"],["3","Selecciona: Artigo, Descrição, Cód. Barras, Últ. Preço Compra"],["4","Exporta para Excel"],["5","Faz upload aqui"]];
+  return'<div class="card" style="margin:16px"><div style="font-weight:600;font-size:14px;margin-bottom:6px">📥 Importar preços do Primavera</div><div style="font-size:12px;color:#6b7280;margin-bottom:16px">Exporta via Office Extensions e faz upload. Os preços actuais são guardados como snapshot.</div><div class="uz" onclick="document.getElementById(\'pf\').click()"><div style="font-size:28px;margin-bottom:8px">📂</div><div style="font-size:13px;font-weight:600">Upload ficheiro Primavera (.xlsx)</div><div style="font-size:11px;color:#9ca3af;margin-top:3px">Colunas: Artigo + Últ. Preço de Compra</div><input type="file" id="pf" accept=".xlsx,.xls" style="display:none" onchange="handlePrim(this)"></div></div><div class="card" style="margin:0 16px 16px"><div style="font-weight:600;font-size:13px;margin-bottom:12px">📋 Como exportar</div>'+steps.map(function(s){return'<div style="display:flex;gap:10px;margin-bottom:10px"><div style="width:22px;height:22px;border-radius:50%;background:#F59E0B;color:#0F1B2D;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;flex-shrink:0">'+s[0]+'</div><div style="font-size:12px;padding-top:3px">'+s[1]+'</div></div>'}).join("")+'</div>';
+}
+function handlePrim(input){
+  if(!input.files[0])return;
+  var reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(e.target.result,{type:"binary"});
+      var data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});
+      var ns={};S.arts.forEach(function(a){ns[a.a]=a.pc});S.sn=ns;
+      var upd=0;
+      data.forEach(function(row){
+        var keys=Object.keys(row);
+        var aK=keys.filter(function(k){return/artigo|codigo|código/i.test(k)})[0];
+        var pK=keys.filter(function(k){return/compra|preço|preco/i.test(k)})[0];
+        if(aK&&pK){var av=String(row[aK]).padStart(8,"0");var pv=parseFloat(String(row[pK]).replace(",","."));var found=S.arts.filter(function(a){return a.a===av})[0];if(found&&pv>0){found.pc=Math.round(pv*10000)/10000;upd++}}
+      });
+      alert("✅ Snapshot guardado!\n"+Object.keys(ns).length+" artigos.\n"+upd+" preços actualizados.");
+      S.tab="conf";re();
+    }catch(err){alert("Erro: "+err.message)}
+  };reader.readAsBinaryString(input.files[0]);
+}
+
+// ── FORNECEDOR ─────────────────────────────────────────────
+function fornHTML(){
+  if(S.fornOk)return'<div class="card" style="margin:16px;background:#F0FDF4;border-color:#86EFAC"><div style="font-weight:700;color:#16A34A;font-size:14px">✅ Preços acordados aplicados!</div><div style="font-size:12px;color:#15803D;margin-top:4px">PVPs recalculados.</div><button class="btn bp" onclick="S.fornOk=false;S.matchData=null;S.fornH=[];S.fornRaw=null;re()" style="margin-top:12px">Nova importação</button></div>';
+  if(S.matchData)return matchHTML();
+  if(S.fornH.length>0)return colPickHTML();
+  return'<div class="card" style="margin:16px"><div style="font-weight:600;font-size:14px;margin-bottom:6px">📤 Tabela de preços do fornecedor</div><div style="font-size:12px;color:#6b7280;margin-bottom:16px">Cruzamos por código de barras e depois por designação.</div><div class="uz" onclick="document.getElementById(\'ff\').click()"><div style="font-size:28px;margin-bottom:8px">📂</div><div style="font-size:13px;font-weight:600">Upload tabela do fornecedor (.xlsx)</div><input type="file" id="ff" accept=".xlsx,.xls" style="display:none" onchange="handleForn(this)"></div></div>';
+}
+function colPickHTML(){
+  var fields=[["Cód. Barras","fColB","Opcional"],["Designação","fColD","Nome do artigo"],["Preço","fColP","Novo preço"]];
+  return'<div class="card" style="margin:16px"><div style="font-weight:600;font-size:14px;margin-bottom:14px">Identifica as colunas</div><div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">'+fields.map(function(x){return'<div><div style="font-size:11px;font-weight:600;margin-bottom:5px">'+x[0]+'</div><select onchange="S.'+x[1]+'=this.value;re()" style="width:100%"><option value="">— Seleccionar —</option>'+S.fornH.map(function(h){return'<option'+(S[x[1]]===h?" selected":"")+'>'+esc(h)+'</option>'}).join("")+'</select><div style="font-size:10px;color:#9ca3af;margin-top:3px">'+x[2]+'</div></div>'}).join("")+'</div><button class="btn bp" '+(!S.fColP||!S.fColD?"disabled":"")+'onclick="doMatch()">🔍 Cruzar com artigos EMPRO</button></div>';
+}
+function matchHTML(){
+  var m=S.matchData,u=S.unmatch;
+  return'<div class="card" style="margin:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><div><div style="font-weight:700;font-size:14px">✅ '+m.length+' artigos identificados</div><div style="font-size:11px;color:#6b7280">Desmarca os que não queres aplicar</div></div><button class="btn bp" onclick="applyPrices()">Aplicar preços</button></div><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f6f6f7"><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Incl.</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Artigo</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Descrição EMPRO</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Designação Fornecedor</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Actual</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Novo</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Δ</th></tr></thead><tbody>'+m.map(function(r,i){var d=((r.pN-r.pA)/r.pA*100);return'<tr style="opacity:'+(r.inc?1:0.4)+'"><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6"><input type="checkbox"'+(r.inc?" checked":"")+" onchange=\"toggleM("+i+")\"></td><td style='padding:6px 10px;border-bottom:1px solid #f1f3f6;font-family:monospace;font-size:10px'>"+r.art+"</td><td style='padding:6px 10px;border-bottom:1px solid #f1f3f6'>"+esc(r.desc)+"</td><td style='padding:6px 10px;border-bottom:1px solid #f1f3f6;color:#6b7280'>"+esc(r.fd)+"</td><td style='padding:6px 10px;border-bottom:1px solid #f1f3f6'>"+eu(r.pA)+"</td><td style='padding:6px 10px;border-bottom:1px solid #f1f3f6;font-weight:600'>"+eu(r.pN)+'</td><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6"><span class="badge '+(d>0?"badge-R":"badge-G")+'">'+(d>0?"▲":"▼")+Math.abs(d).toFixed(1)+'%</span></td></tr>'}).join("")+'</tbody></table></div></div>'+(u.length>0?'<div class="card" style="margin:0 16px 16px"><div style="font-weight:600;font-size:12px;color:#D97706;margin-bottom:10px">⚠️ '+u.length+' não identificados</div><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f6f6f7"><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Designação</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Cód. Barras</th><th style="padding:7px 10px;border-bottom:2px solid #e1e3e5">Preço</th></tr></thead><tbody>'+u.map(function(r){return'<tr><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6">'+esc(r.d)+'</td><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6;font-family:monospace;font-size:10px">'+(r.b||"—")+'</td><td style="padding:6px 10px;border-bottom:1px solid #f1f3f6">'+eu(r.p)+'</td></tr>'}).join("")+'</tbody></table></div>':"");
+}
+function handleForn(input){
+  if(!input.files[0])return;
+  var reader=new FileReader();
+  reader.onload=function(e){var wb=XLSX.read(e.target.result,{type:"binary"});var data=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:""});if(data.length>0){S.fornH=Object.keys(data[0]);S.fornRaw=data}re()};
+  reader.readAsBinaryString(input.files[0]);
+}
+function doMatch(){
+  var matched=[],unm=[];
+  S.fornRaw.forEach(function(row){var b=String(row[S.fColB]||"").trim();var d=String(row[S.fColD]||"").toLowerCase().trim();var p=parseFloat(String(row[S.fColP]).replace(",","."))||0;if(!p)return;var found=b?S.arts.filter(function(a){return a.cb===b})[0]:null;if(!found&&d)found=S.arts.filter(function(a){return a.d.toLowerCase().indexOf(d.slice(0,15))>=0||d.indexOf(a.d.toLowerCase().slice(0,15))>=0})[0];if(found)matched.push({art:found.a,desc:found.d,fd:row[S.fColD]||"",pN:p,pA:found.pc,inc:true});else unm.push({d:row[S.fColD]||"",b:b,p:p})});
+  S.matchData=matched;S.unmatch=unm;re();
+}
+function toggleM(i){S.matchData[i].inc=!S.matchData[i].inc;re()}
+function applyPrices(){S.matchData.filter(function(m){return m.inc}).forEach(function(m){var a=S.arts.filter(function(x){return x.a===m.art})[0];if(a)a.pa=m.pN});S.fornOk=true;re()}
+
+// ── VENDEDOR ───────────────────────────────────────────────
+function vHTML(){
+  var arts=S.arts.filter(function(a){return a.pc>0});
+  var forns=srtL(arts.map(function(a){return a.f}),"Todos");
+  var fA=S.vF==="Todos"?arts:arts.filter(function(a){return a.f===S.vF});
+  var marcas=srtL(fA.map(function(a){return a.ma}),"Todas");
+  var fB=S.vMa==="Todas"?fA:fA.filter(function(a){return a.ma===S.vMa});
+  var modelos=srtL(fB.filter(function(a){return a.mo}).map(function(a){return a.mo}),"Todos");
+  var rows=fB.filter(function(a){return(!S.srch||a.d.toLowerCase().indexOf(S.srch.toLowerCase())>=0||a.ma.toLowerCase().indexOf(S.srch.toLowerCase())>=0)&&(S.vMo==="Todos"||a.mo===S.vMo)});
+  var trs=rows.map(function(a){var p=pvpC(a.pc,a.pa,a.mk);return'<tr><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;font-family:monospace;font-size:10px;color:#6b7280">'+a.a+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(a.d)+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5">'+esc(a.ma||"—")+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;color:#6b7280">'+esc(a.mo||"—")+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right;font-weight:600">'+eu(p)+'</td>'+(S.vH?'<td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right">'+eu(phC(p))+'</td>':"")+(S.vG?'<td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right">'+eu(pgC(p))+'</td>':"")+'</tr>'}).join("");
+  return'<div class="vbar np"><div style="color:#F59E0B;font-weight:700;font-size:17px">EMPRO <span style="color:#4a6080;font-weight:400;font-size:12px">· Tabela de Preços 2026</span></div><div style="display:flex;gap:8px"><button class="btn bp" onclick="window.print()">🖨️ PDF</button><button class="btn" onclick="S.role=\'admin\';S.srch=\'\';re()" style="background:#1a2d45;border-color:#1e3050;color:#8899aa">← Admin</button><button class="btn" onclick="S.role=null;S.step=null;re()" style="background:#1a2d45;border-color:#1e3050;color:#8899aa">Sair</button></div></div><div style="padding:14px 16px;background:#fff;border-bottom:1px solid #e1e3e5;display:flex;gap:8px;flex-wrap:wrap;align-items:center" class="np"><input type="text" placeholder="🔍 Pesquisar..." value="'+esc(S.srch)+'" oninput="S.srch=this.value;re()" style="width:200px"><select onchange="S.vF=this.value;S.vMa=\'Todas\';S.vMo=\'Todos\';re()" style="max-width:170px">'+selO(forns,S.vF)+'</select><select onchange="S.vMa=this.value;S.vMo=\'Todos\';re()" style="max-width:140px">'+selO(marcas,S.vMa)+'</select>'+(modelos.length>1?'<select onchange="S.vMo=this.value;re()" style="max-width:130px">'+selO(modelos,S.vMo)+'</select>':'')+'<div style="display:flex;gap:12px;margin-left:auto"><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox"'+(S.vH?" checked":"")+'onchange="S.vH=!S.vH;re()"> Horeca</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox"'+(S.vG?" checked":"")+'onchange="S.vG=!S.vG;re()"> Garrafeira</label></div></div><div style="overflow-auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#f6f6f7;position:sticky;top:0"><tr><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Artigo</th><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Descrição</th><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Marca</th><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Modelo</th><th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c9cccf">PVP</th>'+(S.vH?'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c9cccf">Horeca</th>':"")+(S.vG?'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c9cccf">Garrafeira</th>':"")+'</tr></thead><tbody>'+trs+'</tbody></table><div style="padding:10px 14px;font-size:11px;color:#6b7280;border-top:1px solid #e1e3e5">'+rows.length+' artigos · Preços com IVA · 2026</div></div>';
+}
+
+// ── DRAG TO FILL ───────────────────────────────────────────
+var drag={on:false,type:"",art:"",val:0};
+document.addEventListener("mousedown",function(e){
+  var h=e.target.closest?e.target.closest(".dh"):null;if(!h)return;
+  e.preventDefault();
+  var row=h.closest("tr");if(!row)return;
+  drag.type=h.getAttribute("data-type")||"mk";
+  drag.art=row.getAttribute("data-art")||row.getAttribute("data-art-g")||"";
+  var a=S.arts.filter(function(x){return x.a===drag.art})[0];if(!a)return;
+  drag.val=mkP(drag.type==="mk5"?(a.mk5||0):a.mk);
+  drag.on=true;
+  var ov=document.getElementById("dov");if(!ov){ov=document.createElement("div");ov.id="dov";ov.className="drag-overlay";document.body.appendChild(ov)}
+  ov.style.display="block";
+});
+document.addEventListener("mousemove",function(e){
+  if(!drag.on)return;
+  var attr=drag.type==="mk5"?"data-art-g":"data-art";
+  var rows=Array.from(document.querySelectorAll("tr["+attr+"]"));
+  var si=-1,ci=-1;
+  rows.forEach(function(r,i){if(r.getAttribute(attr)===drag.art)si=i;var rc=r.getBoundingClientRect();if(e.clientY>=rc.top&&e.clientY<=rc.bottom)ci=i});
+  rows.forEach(function(r){r.classList.remove("drag-target")});
+  if(si<0||ci<0)return;
+  for(var i=Math.min(si,ci);i<=Math.max(si,ci);i++){if(i!==si)rows[i].classList.add("drag-target")}
+});
+document.addEventListener("mouseup",function(e){
+  if(!drag.on)return;drag.on=false;
+  var ov=document.getElementById("dov");if(ov)ov.style.display="none";
+  var attr=drag.type==="mk5"?"data-art-g":"data-art";
+  var changed=false;
+  document.querySelectorAll("tr["+attr+"].drag-target").forEach(function(r){
+    var artigo=r.getAttribute(attr);
+    var a=S.arts.filter(function(x){return x.a===artigo})[0];
+    if(a){var mv=Math.round(drag.val/100*10000)/10000;if(drag.type==="mk5")a.mk5=mv;else a.mk=mv;changed=true}
+    r.classList.remove("drag-target");
+  });
+  if(changed)re();
+});
+
+re();
+</script>
+</body>
+</html>
