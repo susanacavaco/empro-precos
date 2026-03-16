@@ -34,6 +34,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:#f6f6f7;color:#1a1a2
 .sheet td:first-child{border-left:none}
 .sheet tr:hover td{background:#f9fafb}
 .sheet tr.aR td{background:#fff5f5}
+.noPrice td{background:#f9fafb;color:#c4c4c4}
 .sheet tr.aR:hover td{background:#fee2e2}
 
 /* Cell content */
@@ -142,6 +143,7 @@ var S={
   srch:"",fF:"Todos",fMa:"Todas",fMo:"Todos",only:false,page:0,
   gSrch:"",gForn:"Todos",gMarca:"Todas",gModelo:"Todos",gPage:0,
   vF:"Todos",vMa:"Todas",vMo:"Todos",vH:true,vG:true,
+  sortCol:null,sortDir:1,
   importLog:null,matchData:null,unmatch:[],fornH:[],fornRaw:null,
   fColB:"",fColD:"",fColP:"",fornOk:false
 };
@@ -151,6 +153,30 @@ function re(){var el=document.getElementById("root");if(!S.role){el.innerHTML=lH
 
 function srtL(arr,ph){var o=[ph];arr.forEach(function(x){if(x&&o.indexOf(x)<0)o.push(x)});return o.sort(function(a,b){return a===ph?-1:b===ph?1:a.localeCompare(b)})}
 function selO(list,cur){return list.map(function(x){return"<option"+(x===cur?" selected":"")+">"+esc(x)+"</option>"}).join("")}
+
+// ── SORT ──────────────────────────────────────────────────
+function sortRows(rows,col){
+  if(!col)return rows;
+  return rows.slice().sort(function(a,b){
+    var va=col==="pvpV"?pvpC(a.pc,a.pa,a.mk):col==="mgV"?mgC(pvpC(a.pc,a.pa,a.mk),a.pc):a[col];
+    var vb=col==="pvpV"?pvpC(b.pc,b.pa,b.mk):col==="mgV"?mgC(pvpC(b.pc,b.pa,b.mk),b.pc):b[col];
+    if(typeof va==="string")va=va.toLowerCase();
+    if(typeof vb==="string")vb=vb.toLowerCase();
+    return va<vb?-1*S.sortDir:va>vb?1*S.sortDir:0;
+  });
+}
+function thS(lbl,col,w){
+  var on=S.sortCol===col;
+  var arrow=on?(S.sortDir===1?" ▲":" ▼"):"";
+  var clr=on?"color:#F59E0B;":"";
+  return '<th style="min-width:'+w+'px;text-align:right;cursor:pointer;'+clr+'" onclick="S.sortCol=\''+col+'\';S.sortDir='+(on?"S.sortDir*-1":"1")+';S.page=0;re()">'+lbl+arrow+'</th>';
+}
+function thSL(lbl,col,w){
+  var on=S.sortCol===col;
+  var arrow=on?(S.sortDir===1?" ▲":" ▼"):"";
+  var clr=on?"color:#F59E0B;":"";
+  return '<th style="min-width:'+w+'px;cursor:pointer;'+clr+'" onclick="S.sortCol=\''+col+'\';S.sortDir='+(on?"S.sortDir*-1":"1")+';S.page=0;re()">'+lbl+arrow+'</th>';
+}
 
 // ── LOGIN ──────────────────────────────────────────────────
 function lHTML(){
@@ -165,7 +191,11 @@ function adminHTML(){
   var tabs=[["importar","📋","Importar Tabela"],["conf","📊","Conferência"],["garraf","🍷","Garrafeira"],["prim","📥","Primavera"],["forn","📤","Fornecedor"]];
   var sb='<div class="sb"><div class="logo"><div class="logo-t">EMPRO</div><div class="logo-s">Gestão de Preços 2026</div></div><div style="flex:1;overflow-y:auto"><div class="ns">Administração</div>';
   tabs.forEach(function(t){sb+='<div class="ni'+(S.tab===t[0]?" on":"")+'\" onclick="st(\''+t[0]+'\')">'+t[1]+" "+t[2]+"</div>"});
-  sb+='<div class="ns" style="margin-top:10px">Acesso</div><div class="ni" onclick="S.role=\'vendor\';re()">👤 Ver como Vendedor</div></div>';
+  sb+='<div class="ns" style="margin-top:10px">Acesso</div><div class="ni" onclick="S.role=\'vendor\';re()">👤 Ver como Vendedor</div>'+
+  '<div class="ns" style="margin-top:6px">Imprimir</div>'+
+  '<div class="ni" onclick="printTabela(\'fornecedor\')" title="PDF por fornecedor">🖨️ Por Fornecedor</div>'+
+  '<div class="ni" onclick="printTabela(\'marca\')" title="PDF por marca">🖨️ Por Marca</div>'+
+  '</div>';
   sb+='<div style="padding:0 12px 16px"><div style="font-size:10px;color:#4a6080;text-align:center;margin-bottom:8px;padding:6px;background:#1a2d45;border-radius:6px">'+(S.isDemo?"⚠️ Demonstração":"✅ "+S.arts.length+" artigos")+'</div><button class="btn" onclick="S.role=null;S.step=null;re()" style="width:100%;color:#4a6080;border-color:#1e3050;background:transparent;font-size:11px">Sair</button></div></div>';
   var TITLES={importar:"📋 Importar Tabela",conf:"📊 Conferência de Preços",garraf:"🍷 Garrafeira",prim:"📥 Actualizar Primavera",forn:"📤 Tabela Fornecedor"};
   var content;
@@ -228,20 +258,24 @@ function confHTML(){
     var ms=!S.srch||a.d.toLowerCase().indexOf(S.srch.toLowerCase())>=0||a.a.indexOf(S.srch)>=0||a.cb.indexOf(S.srch)>=0||a.ma.toLowerCase().indexOf(S.srch.toLowerCase())>=0;
     return ms&&(S.fF==="Todos"||a.f===S.fF)&&(S.fMa==="Todas"||a.ma===S.fMa)&&(S.fMo==="Todos"||a.mo===S.fMo)&&(!S.only||(S.sn[a.a]&&a.pc>S.sn[a.a]));
   });
+  rows=sortRows(rows,S.sortCol);
   var pg=rows.slice(S.page*PER,(S.page+1)*PER);var maxPg=Math.ceil(rows.length/PER);
 
   var stats='<div class="stats"><div class="stat-cell"><div class="stat-val">'+arts.length+'</div><div class="stat-lbl">Total artigos</div></div><div class="stat-cell"><div class="stat-val" style="color:#DC2626">'+alts.length+'</div><div class="stat-lbl">Subidas de preço</div></div><div class="stat-cell"><div class="stat-val" style="color:#D97706">'+arts.filter(function(a){return a.pa>0}).length+'</div><div class="stat-lbl">Preço acordado</div></div><div class="stat-cell"><div class="stat-val" style="color:#16A34A">'+g35+'</div><div class="stat-lbl">Margem &gt; 35%</div></div></div>';
 
-  var fbar='<div class="fbar np">'+
-    (S.isDemo?'<span style="font-size:11px;color:#92400e;background:#FFFBEB;padding:4px 10px;border-radius:4px;border:1px solid #FDE68A">⚠️ Demo — <a href="#" onclick="st(\'importar\');return false" style="color:#92400e;font-weight:600">importar Excel</a></span>':'')+
-    '<input type="text" placeholder="🔍 Pesquisar..." value="'+esc(S.srch)+'" oninput="S.srch=this.value;S.page=0;re()" style="width:220px">'+
-    '<select onchange="S.fF=this.value;S.fMa=\'Todas\';S.fMo=\'Todos\';S.page=0;re()" style="max-width:170px">'+selO(forns,S.fF)+'</select>'+
-    '<select onchange="S.fMa=this.value;S.fMo=\'Todos\';S.page=0;re()" style="max-width:140px">'+selO(marcas,S.fMa)+'</select>'+
-    (modelos.length>1?'<select onchange="S.fMo=this.value;S.page=0;re()" style="max-width:130px">'+selO(modelos,S.fMo)+'</select>':'')+
-    '<button class="btn'+(S.only?" bd":"")+'" onclick="S.only=!S.only;S.page=0;re()">'+(S.only?"⚠️ Só alertas":"Todos")+'</button>'+
-    '<span style="margin-left:auto;font-size:11px;color:#6b7280">'+rows.length+' artigos</span>'+
+  var fbar='<div class="fbar np" style="flex-direction:column;gap:4px">'+
+    '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'+
+    (S.isDemo?'<div><span style="font-size:11px;color:#92400e;background:#FFFBEB;padding:4px 10px;border-radius:4px;border:1px solid #FDE68A">⚠️ Demo — <a href="#" onclick="st(\'importar\');return false" style="color:#92400e;font-weight:600">importar Excel</a></span></div>':'')+
+    '<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">PESQUISA</div><input type="text" placeholder="🔍 Artigo, descrição, marca..." value="'+esc(S.srch)+'" oninput="S.srch=this.value;S.page=0;re()" style="width:220px"></div>'+
+    '<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">FORNECEDOR</div><select onchange="S.fF=this.value;S.fMa=\'Todas\';S.fMo=\'Todos\';S.page=0;re()" style="max-width:170px">'+selO(forns,S.fF)+'</select></div>'+
+    '<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">MARCA</div><select onchange="S.fMa=this.value;S.fMo=\'Todos\';S.page=0;re()" style="max-width:140px">'+selO(marcas,S.fMa)+'</select></div>'+
+    (modelos.length>1?'<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">MODELO</div><select onchange="S.fMo=this.value;S.page=0;re()" style="max-width:130px">'+selO(modelos,S.fMo)+'</select></div>':'')+
+    '<div style="align-self:flex-end"><button class="btn'+(S.only?" bd":"")+'" onclick="S.only=!S.only;S.page=0;re()">'+(S.only?"⚠️ Só alertas":"Todos")+'</button></div>'+
+    '<div style="margin-left:auto;display:flex;align-items:flex-end;gap:8px">'+
+    '<span style="font-size:11px;color:#6b7280;padding-bottom:6px">'+rows.length+' artigos</span>'+
+    '<button class="btn" onclick="exportExcel(\'conf\')" title="Exportar para Excel" style="height:32px">📥 Excel</button>'+
     (maxPg>1?'<div style="display:flex;align-items:center;gap:6px"><button class="btn" onclick="if(S.page>0){S.page--;re()}" '+(S.page===0?"disabled":"")+'>←</button><span style="font-size:12px">'+( S.page+1)+'/'+maxPg+'</span><button class="btn" onclick="if(S.page<'+(maxPg-1)+'){S.page++;re()}" '+(S.page>=maxPg-1?"disabled":"")+'>→</button></div>':'')+
-    '</div>';
+    '</div></div></div>';
 
   var trs=pg.map(function(a){
     var prev=S.sn[a.a],isA=prev&&a.pc>prev;
@@ -249,7 +283,7 @@ function confHTML(){
     var p=pvpC(a.pc,a.pa,a.mk),m=mgC(p,a.pc);
     var ed=a.p1>0&&p>0?((p-a.p1)/a.p1*100):null;
     var mBadge=m>0.35?"badge-G":m>0.25?"badge-A":"badge-R";
-    return'<tr class="'+(isA?"aR":"")+'\" data-art="'+a.a+'">'+
+    return'<tr class="'+(isA?"aR":a.pc<=0?"noPrice":"")+'\" data-art="'+a.a+'">'+
       '<td><span class="cell code">'+a.a+'</span></td>'+
       '<td><span class="cell" style="max-width:220px" title="'+esc(a.d)+'">'+esc(a.d)+'</span></td>'+
       '<td><span class="cell" style="max-width:150px;color:#6b7280" title="'+esc(a.f)+'">'+esc(a.f||"—")+'</span></td>'+
@@ -270,10 +304,12 @@ function confHTML(){
   return stats+fbar+
     '<div class="sheet-wrap"><table class="sheet">'+
     '<thead><tr>'+
-    '<th style="min-width:90px">Artigo</th><th style="min-width:220px">Descrição</th><th style="min-width:150px">Fornecedor</th><th style="min-width:130px">Marca</th><th style="min-width:110px">Modelo</th>'+
-    '<th style="min-width:85px;text-align:right">Pr. Ant.</th><th style="min-width:90px;text-align:right">Pr. Compra</th><th style="min-width:75px;text-align:right">Δ</th>'+
+    thSL("Artigo","a",90)+thSL("Descrição","d",220)+thSL("Fornecedor","f",150)+thSL("Marca","ma",130)+thSL("Modelo","mo",110)+
+    '<th style="min-width:85px;text-align:right">Pr. Ant.</th>'+thS("Pr. Compra","pc",90)+
+    '<th style="min-width:75px;text-align:right">Δ</th>'+
     '<th style="min-width:100px;text-align:right">Markup %<span style="font-size:9px;color:#F59E0B;margin-left:4px">✏️ clica</span></th>'+
-    '<th style="min-width:90px;text-align:right">PVP</th><th style="min-width:80px;text-align:right">Margem</th><th style="min-width:85px;text-align:right">Horeca</th><th style="min-width:90px;text-align:right">Garrafeira</th><th style="min-width:90px;text-align:right">ERP PVP1</th>'+
+    thS("PVP","pvpV",90)+thS("Margem","mgV",80)+
+    '<th style="min-width:85px;text-align:right">Horeca</th><th style="min-width:90px;text-align:right">Garraf.</th><th style="min-width:90px;text-align:right">ERP PVP1</th>'+
     '</tr></thead><tbody>'+trs+'</tbody></table>'+
     (pg.length===0?'<div style="padding:40px;text-align:center;color:#9ca3af">Nenhum artigo encontrado.</div>':'')+
     '</div>';
@@ -299,14 +335,17 @@ function garrafHTML(){
 
   var stats='<div class="stats"><div class="stat-cell"><div class="stat-val">'+rows.length+'</div><div class="stat-lbl">Artigos filtrados</div></div><div class="stat-cell"><div class="stat-val" style="color:#7c3aed">'+withMk5+'</div><div class="stat-lbl">Com Markup5</div></div><div class="stat-cell"><div class="stat-val" style="color:#16A34A">'+ab30+'</div><div class="stat-lbl">Margem &gt; 30%</div></div><div class="stat-cell"><div class="stat-val" style="color:#0369a1">'+pct(avgMg)+'</div><div class="stat-lbl">Margem média</div></div></div>';
 
-  var fbar='<div class="fbar np">'+
-    '<input type="text" placeholder="🔍 Pesquisar..." value="'+esc(S.gSrch)+'" oninput="S.gSrch=this.value;S.gPage=0;re()" style="width:220px">'+
-    '<select onchange="S.gForn=this.value;S.gMarca=\'Todas\';S.gModelo=\'Todos\';S.gPage=0;re()" style="max-width:170px">'+selO(forns,S.gForn)+'</select>'+
-    '<select onchange="S.gMarca=this.value;S.gModelo=\'Todos\';S.gPage=0;re()" style="max-width:140px">'+selO(marcas,S.gMarca)+'</select>'+
-    (modelos.length>1?'<select onchange="S.gModelo=this.value;S.gPage=0;re()" style="max-width:130px">'+selO(modelos,S.gModelo)+'</select>':'')+
-    '<span style="margin-left:auto;font-size:11px;color:#6b7280">'+rows.length+' artigos</span>'+
+  var fbar='<div class="fbar np" style="flex-direction:column;gap:4px">'+
+    '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'+
+    '<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">PESQUISA</div><input type="text" placeholder="🔍 Artigo, descrição, marca..." value="'+esc(S.gSrch)+'" oninput="S.gSrch=this.value;S.gPage=0;re()" style="width:220px"></div>'+
+    '<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">FORNECEDOR</div><select onchange="S.gForn=this.value;S.gMarca=\'Todas\';S.gModelo=\'Todos\';S.gPage=0;re()" style="max-width:170px">'+selO(forns,S.gForn)+'</select></div>'+
+    '<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">MARCA</div><select onchange="S.gMarca=this.value;S.gModelo=\'Todos\';S.gPage=0;re()" style="max-width:140px">'+selO(marcas,S.gMarca)+'</select></div>'+
+    (modelos.length>1?'<div><div style="font-size:10px;color:#9ca3af;font-weight:500;margin-bottom:3px;letter-spacing:0.3px">MODELO</div><select onchange="S.gModelo=this.value;S.gPage=0;re()" style="max-width:130px">'+selO(modelos,S.gModelo)+'</select></div>':'')+
+    '<div style="margin-left:auto;display:flex;align-items:flex-end;gap:8px">'+
+    '<span style="font-size:11px;color:#6b7280;padding-bottom:6px">'+rows.length+' artigos</span>'+
+    '<button class="btn" onclick="exportExcel(\'garraf\')" title="Exportar para Excel" style="height:32px;gap:5px">📥 Excel</button>'+
     (maxPg>1?'<div style="display:flex;align-items:center;gap:6px"><button class="btn" onclick="if(S.gPage>0){S.gPage--;re()}" '+(S.gPage===0?"disabled":"")+'>←</button><span style="font-size:12px">'+(S.gPage+1)+'/'+maxPg+'</span><button class="btn" onclick="if(S.gPage<'+(maxPg-1)+'){S.gPage++;re()}" '+(S.gPage>=maxPg-1?"disabled":"")+'>→</button></div>':'')+
-    '</div>';
+    '</div></div></div>';
 
   var trs=pg.map(function(a){
     var p=pvpC(a.pc,a.pa,a.mk);
@@ -412,6 +451,185 @@ function doMatch(){
 function toggleM(i){S.matchData[i].inc=!S.matchData[i].inc;re()}
 function applyPrices(){S.matchData.filter(function(m){return m.inc}).forEach(function(m){var a=S.arts.filter(function(x){return x.a===m.art})[0];if(a)a.pa=m.pN});S.fornOk=true;re()}
 
+// ── PRINT PDF ─────────────────────────────────────────────
+function printTabela(groupBy) {
+  var arts = S.arts.filter(function(a) { return a.pc > 0; });
+  if (arts.length === 0) { alert("Importa primeiro o ficheiro Excel."); return; }
+
+  var groups = {};
+  arts.forEach(function(a) {
+    var key = groupBy === "marca" ? (a.ma || "Sem Marca") : (a.f || "Sem Fornecedor");
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(a);
+  });
+  var keys = Object.keys(groups).sort();
+  var label = groupBy === "marca" ? "Marca" : "Fornecedor";
+
+  var old = document.getElementById("printModal");
+  if (old) old.parentNode.removeChild(old);
+
+  var checkboxes = keys.map(function(k) {
+    var count = groups[k].length;
+    var safe = k.replace(/&/g,"&amp;").replace(/"/g,"&quot;");
+    return '<label style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid #f1f3f6;cursor:pointer">' +
+      '<input type="checkbox" value="' + safe + '" checked style="width:15px;height:15px;cursor:pointer;flex-shrink:0">' +
+      '<span style="flex:1;font-size:12px;color:#374151">' + k.replace(/&/g,"&amp;") + '</span>' +
+      '<span style="font-size:10px;color:#9ca3af">' + count + ' art.</span>' +
+      '</label>';
+  }).join("");
+
+  var modal = document.createElement("div");
+  modal.id = "printModal";
+  modal.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:99998;display:flex;align-items:center;justify-content:center";
+  modal.innerHTML =
+    '<div style="background:#fff;border-radius:12px;width:500px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)">' +
+      '<div style="padding:16px 18px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;flex-shrink:0">' +
+        '<div><div style="font-weight:700;font-size:15px;color:#0F1B2D">&#128424; Imprimir por ' + label + '</div>' +
+        '<div style="font-size:11px;color:#6b7280;margin-top:2px">Selecciona o que queres incluir no PDF</div></div>' +
+        '<button onclick="closePrintModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#9ca3af;line-height:1">&#215;</button>' +
+      '</div>' +
+      '<div style="padding:8px 12px;border-bottom:1px solid #e5e7eb;display:flex;gap:8px;align-items:center;flex-shrink:0">' +
+        '<button onclick="toggleAllPrint(true)" class="btn" style="font-size:11px;height:28px;padding:0 10px">Tudo</button>' +
+        '<button onclick="toggleAllPrint(false)" class="btn" style="font-size:11px;height:28px;padding:0 10px">Limpar</button>' +
+        '<span id="printCount" style="margin-left:auto;font-size:11px;color:#6b7280">' + keys.length + '/' + keys.length + ' seleccionados</span>' +
+      '</div>' +
+      '<div id="printChecks" style="overflow-y:auto;flex:1;min-height:0">' + checkboxes + '</div>' +
+      '<div style="padding:12px 16px;border-top:1px solid #e5e7eb;display:flex;gap:8px;justify-content:flex-end;flex-shrink:0">' +
+        '<button onclick="closePrintModal()" class="btn" style="font-size:12px">Cancelar</button>' +
+        '<button onclick="gerarPDF(\'' + groupBy + '\')" class="btn bp" style="font-size:12px">&#128424; Gerar PDF</button>' +
+      '</div>' +
+    '</div>';
+
+  document.body.appendChild(modal);
+  document.querySelectorAll("#printChecks input").forEach(function(cb) {
+    cb.addEventListener("change", updatePrintCount);
+  });
+}
+
+function updatePrintCount() {
+  var all = document.querySelectorAll("#printChecks input");
+  var sel = document.querySelectorAll("#printChecks input:checked");
+  var el = document.getElementById("printCount");
+  if (el) el.textContent = sel.length + "/" + all.length + " seleccionados";
+}
+function toggleAllPrint(v) {
+  document.querySelectorAll("#printChecks input").forEach(function(c){ c.checked = v; });
+  updatePrintCount();
+}
+function closePrintModal() {
+  var el = document.getElementById("printModal");
+  if (el) el.parentNode.removeChild(el);
+}
+
+function gerarPDF(groupBy) {
+  var arts = S.arts.filter(function(a) { return a.pc > 0; });
+  var checks = Array.from(document.querySelectorAll("#printChecks input:checked"));
+  var selected = checks.map(function(c){ return c.value; });
+  if (!selected.length) { alert("Selecciona pelo menos um item."); return; }
+  closePrintModal();
+
+  // Build selected groups
+  var groups = {};
+  arts.forEach(function(a) {
+    var key = groupBy === "marca" ? (a.ma || "Sem Marca") : (a.f || "Sem Fornecedor");
+    if (selected.indexOf(key) >= 0) {
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(a);
+    }
+  });
+
+  var label = groupBy === "marca" ? "Marca" : "Fornecedor";
+  var col2label = groupBy === "marca" ? "Fornecedor" : "Marca";
+  var date = new Date().toLocaleDateString("pt-PT");
+  var totalArt = 0;
+
+  var bodyHTML = "";
+  Object.keys(groups).sort().forEach(function(key) {
+    var list = groups[key];
+    totalArt += list.length;
+    var trs = list.map(function(a) {
+      var p = pvpC(a.pc, a.pa, a.mk);
+      var ph = Math.round(p * 0.85 * 100) / 100;
+      var pGa = pvpG(a);
+      var col2 = (groupBy === "marca" ? a.f : a.ma) || "";
+      return "<tr>" +
+        "<td class='c'>" + a.a + "</td>" +
+        "<td>" + a.d.replace(/&/g,"&amp;") + "</td>" +
+        "<td>" + col2.replace(/&/g,"&amp;") + "</td>" +
+        "<td>" + (a.mo||"").replace(/&/g,"&amp;") + "</td>" +
+        "<td class='r'>" + (p>0?eu(p):"&mdash;") + "</td>" +
+        "<td class='ct'>15%</td>" +
+        "<td class='r'>" + (ph>0?eu(ph):"&mdash;") + "</td>" +
+        "<td class='ct'>20%</td>" +
+        "<td class='r pu'>" + (pGa>0?eu(pGa):"&mdash;") + "</td>" +
+        "</tr>";
+    }).join("");
+
+    bodyHTML +=
+      "<div class='grp'>" +
+        "<div class='ghd'>" + (groupBy==="marca"?"Marca: ":"Fornecedor: ") +
+        key.replace(/&/g,"&amp;") +
+        " <span class='gcnt'>(" + list.length + " artigos)</span></div>" +
+        "<table><thead><tr>" +
+        "<th>Artigo</th><th>Descri&ccedil;&atilde;o</th><th>" + col2label + "</th><th>Modelo</th>" +
+        "<th class='r'>PVP</th><th class='ct'>Desc.</th>" +
+        "<th class='r'>PVP Horeca</th><th class='ct'>Desc.</th>" +
+        "<th class='r pu'>PVP Garrafeira</th>" +
+        "</tr></thead><tbody>" + trs + "</tbody></table>" +
+      "</div>";
+  });
+
+  var css =
+    "@page{size:A4 landscape;margin:10mm}" +
+    "body{font-family:Arial,Helvetica,sans-serif;font-size:9px;color:#1a1a2e;margin:0;padding:8px}" +
+    ".hdr{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:12px;padding-bottom:7px;border-bottom:2.5px solid #0F1B2D}" +
+    ".brand{font-size:20px;font-weight:900;color:#0F1B2D;letter-spacing:-1px}" +
+    ".sub{font-size:9px;color:#6b7280;margin-top:2px}" +
+    ".meta{text-align:right;font-size:8px;color:#6b7280}" +
+    ".grp{margin-bottom:12px;page-break-inside:avoid}" +
+    ".ghd{background:#0F1B2D;color:#F59E0B;font-weight:700;font-size:8.5px;padding:3px 6px}" +
+    ".gcnt{color:#8899aa;font-weight:400}" +
+    "table{width:100%;border-collapse:collapse}" +
+    "th{background:#F8FAFC;padding:3px 5px;font-size:7.5px;color:#6b7280;border-bottom:1.5px solid #c9cccf;font-weight:700;white-space:nowrap}" +
+    "td{padding:2.5px 5px;font-size:8px;border-bottom:1px solid #f0f0f0}" +
+    "tr:nth-child(even) td{background:#fafafa}" +
+    ".c{font-family:monospace;color:#6b7280;white-space:nowrap}" +
+    ".r{text-align:right;white-space:nowrap}" +
+    ".ct{text-align:center;color:#9ca3af}" +
+    ".pu{color:#7c3aed}";
+
+  var fullHTML =
+    "<!DOCTYPE html><html><head><meta charset='UTF-8'>" +
+    "<title>EMPRO Tabela de Pre&ccedil;os 2026</title>" +
+    "<style>" + css + "</style></head><body>" +
+    "<div class='hdr'>" +
+      "<div><div class='brand'>EMPRO</div>" +
+      "<div class='sub'>Tabela de Pre&ccedil;os &middot; 2026 &middot; Por " + label + "</div></div>" +
+      "<div class='meta'>" + date + "<br>" + totalArt + " artigos</div>" +
+    "</div>" +
+    bodyHTML +
+    "</body></html>";
+
+  // Use hidden iframe to print — works without popups
+  var old = document.getElementById("printFrame");
+  if (old) old.parentNode.removeChild(old);
+
+  var iframe = document.createElement("iframe");
+  iframe.id = "printFrame";
+  iframe.style.cssText = "position:fixed;right:-9999px;top:-9999px;width:1px;height:1px;border:none";
+  document.body.appendChild(iframe);
+
+  var doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(fullHTML);
+  doc.close();
+
+  setTimeout(function() {
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  }, 400);
+}
+
 // ── VENDEDOR ───────────────────────────────────────────────
 function vHTML(){
   var arts=S.arts.filter(function(a){return a.pc>0});
@@ -421,8 +639,80 @@ function vHTML(){
   var fB=S.vMa==="Todas"?fA:fA.filter(function(a){return a.ma===S.vMa});
   var modelos=srtL(fB.filter(function(a){return a.mo}).map(function(a){return a.mo}),"Todos");
   var rows=fB.filter(function(a){return(!S.srch||a.d.toLowerCase().indexOf(S.srch.toLowerCase())>=0||a.ma.toLowerCase().indexOf(S.srch.toLowerCase())>=0)&&(S.vMo==="Todos"||a.mo===S.vMo)});
-  var trs=rows.map(function(a){var p=pvpC(a.pc,a.pa,a.mk);return'<tr><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;font-family:monospace;font-size:10px;color:#6b7280">'+a.a+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(a.d)+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5">'+esc(a.ma||"—")+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;color:#6b7280">'+esc(a.mo||"—")+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right;font-weight:600">'+eu(p)+'</td>'+(S.vH?'<td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right">'+eu(phC(p))+'</td>':"")+(S.vG?'<td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right">'+eu(pgC(p))+'</td>':"")+'</tr>'}).join("");
+  var trs=rows.map(function(a){var p=pvpC(a.pc,a.pa,a.mk);return'<tr><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;font-family:monospace;font-size:10px;color:#6b7280">'+a.a+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(a.d)+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5">'+esc(a.ma||"—")+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;color:#6b7280">'+esc(a.mo||"—")+'</td><td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right;font-weight:600">'+eu(p)+'</td>'+(S.vH?'<td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right">'+eu(phC(p))+'</td>':"")+'<td style="padding:6px 10px;border-bottom:1px solid #e1e3e5;text-align:right;color:#7c3aed">'+eu(pvpG(a))+'</td>'+'</tr>'}).join("");
   return'<div class="vbar np"><div style="color:#F59E0B;font-weight:700;font-size:17px">EMPRO <span style="color:#4a6080;font-weight:400;font-size:12px">· Tabela de Preços 2026</span></div><div style="display:flex;gap:8px"><button class="btn bp" onclick="window.print()">🖨️ PDF</button><button class="btn" onclick="S.role=\'admin\';S.srch=\'\';re()" style="background:#1a2d45;border-color:#1e3050;color:#8899aa">← Admin</button><button class="btn" onclick="S.role=null;S.step=null;re()" style="background:#1a2d45;border-color:#1e3050;color:#8899aa">Sair</button></div></div><div style="padding:14px 16px;background:#fff;border-bottom:1px solid #e1e3e5;display:flex;gap:8px;flex-wrap:wrap;align-items:center" class="np"><input type="text" placeholder="🔍 Pesquisar..." value="'+esc(S.srch)+'" oninput="S.srch=this.value;re()" style="width:200px"><select onchange="S.vF=this.value;S.vMa=\'Todas\';S.vMo=\'Todos\';re()" style="max-width:170px">'+selO(forns,S.vF)+'</select><select onchange="S.vMa=this.value;S.vMo=\'Todos\';re()" style="max-width:140px">'+selO(marcas,S.vMa)+'</select>'+(modelos.length>1?'<select onchange="S.vMo=this.value;re()" style="max-width:130px">'+selO(modelos,S.vMo)+'</select>':'')+'<div style="display:flex;gap:12px;margin-left:auto"><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox"'+(S.vH?" checked":"")+'onchange="S.vH=!S.vH;re()"> Horeca</label><label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox"'+(S.vG?" checked":"")+'onchange="S.vG=!S.vG;re()"> Garrafeira</label></div></div><div style="overflow-auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead style="background:#f6f6f7;position:sticky;top:0"><tr><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Artigo</th><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Descrição</th><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Marca</th><th style="padding:8px 10px;text-align:left;border-bottom:2px solid #c9cccf">Modelo</th><th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c9cccf">PVP</th>'+(S.vH?'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c9cccf">Horeca</th>':"")+(S.vG?'<th style="padding:8px 10px;text-align:right;border-bottom:2px solid #c9cccf">Garrafeira</th>':"")+'</tr></thead><tbody>'+trs+'</tbody></table><div style="padding:10px 14px;font-size:11px;color:#6b7280;border-top:1px solid #e1e3e5">'+rows.length+' artigos · Preços com IVA · 2026</div></div>';
+}
+
+// ── EXPORT EXCEL ──────────────────────────────────────────
+function exportExcel(type) {
+  var arts = type === "garraf"
+    ? S.arts.filter(function(a) { return a.pc > 0; })
+    : S.arts;
+
+  // Apply current filters
+  if (type === "garraf") {
+    if (S.gForn !== "Todos") arts = arts.filter(function(a) { return a.f === S.gForn; });
+    if (S.gMarca !== "Todas") arts = arts.filter(function(a) { return a.ma === S.gMarca; });
+    if (S.gModelo !== "Todos") arts = arts.filter(function(a) { return a.mo === S.gModelo; });
+    if (S.gSrch) arts = arts.filter(function(a) { return a.d.toLowerCase().indexOf(S.gSrch.toLowerCase()) >= 0 || a.ma.toLowerCase().indexOf(S.gSrch.toLowerCase()) >= 0; });
+  } else {
+    if (S.fF !== "Todos") arts = arts.filter(function(a) { return a.f === S.fF; });
+    if (S.fMa !== "Todas") arts = arts.filter(function(a) { return a.ma === S.fMa; });
+    if (S.fMo !== "Todos") arts = arts.filter(function(a) { return a.mo === S.fMo; });
+    if (S.srch) arts = arts.filter(function(a) { return a.d.toLowerCase().indexOf(S.srch.toLowerCase()) >= 0 || a.a.indexOf(S.srch) >= 0 || a.ma.toLowerCase().indexOf(S.srch.toLowerCase()) >= 0; });
+    if (S.only) arts = arts.filter(function(a) { var p = S.sn[a.a]; return p && a.pc > p; });
+  }
+
+  var rows;
+  if (type === "garraf") {
+    rows = [["Artigo","Descrição","Fornecedor","Marca","Modelo","Pr. Compra","PVP Geral","PVP×80%","Markup5 %","PVP Garrafeira","Margem %"]];
+    arts.forEach(function(a) {
+      var p = pvpC(a.pc, a.pa, a.mk);
+      var pG = pvpG(a);
+      var base = a.pa > 0 ? a.pa : a.pc;
+      var mgG = mgC(pG, base);
+      rows.push([a.a, a.d, a.f, a.ma, a.mo,
+        a.pc > 0 ? a.pc : "",
+        p > 0 ? p : "",
+        p > 0 ? pgC(p) : "",
+        mkP(a.mk5 || 0),
+        pG > 0 ? pG : "",
+        pG > 0 ? parseFloat((mgG * 100).toFixed(1)) : ""
+      ]);
+    });
+  } else {
+    rows = [["Artigo","Descrição","Fornecedor","Marca","Modelo","Pr. Compra","Pr. Acordado","Markup %","PVP","Margem %","Horeca","Garrafeira","ERP PVP1"]];
+    arts.forEach(function(a) {
+      var p = pvpC(a.pc, a.pa, a.mk);
+      var m = mgC(p, a.pc);
+      rows.push([a.a, a.d, a.f, a.ma, a.mo,
+        a.pc > 0 ? a.pc : "",
+        a.pa > 0 ? a.pa : "",
+        mkP(a.mk),
+        p > 0 ? p : "",
+        p > 0 ? parseFloat((m * 100).toFixed(1)) : "",
+        p > 0 ? phC(p) : "",
+        p > 0 ? pgC(p) : "",
+        a.p1 > 0 ? a.p1 : ""
+      ]);
+    });
+  }
+
+  var ws = XLSX.utils.aoa_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = type === "garraf"
+    ? [{wch:10},{wch:40},{wch:30},{wch:20},{wch:16},{wch:12},{wch:12},{wch:12},{wch:12},{wch:14},{wch:10}]
+    : [{wch:10},{wch:40},{wch:30},{wch:20},{wch:16},{wch:12},{wch:12},{wch:10},{wch:10},{wch:10},{wch:10},{wch:12},{wch:12}];
+
+  var wb = XLSX.utils.book_new();
+  var sheetName = type === "garraf" ? "Garrafeira" : "Conferência";
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  var date = new Date();
+  var ds = date.getFullYear() + ("0"+(date.getMonth()+1)).slice(-2) + ("0"+date.getDate()).slice(-2);
+  var filename = "EMPRO_" + sheetName + "_" + ds + ".xlsx";
+  XLSX.writeFile(wb, filename);
 }
 
 // ── DRAG TO FILL ───────────────────────────────────────────
