@@ -80,10 +80,10 @@ input[type=text]:focus,select:focus{border-color:#F59E0B;box-shadow:0 0 0 2px rg
 .uz{border:2px dashed #c9cccf;border-radius:8px;padding:28px;text-align:center;cursor:pointer}
 .uz:hover{border-color:#F59E0B;background:#fffbeb}
 
-/* Drag handle */
-.dh{width:10px;cursor:ns-resize;position:absolute;right:3px;top:50%;transform:translateY(-50%);display:none;flex-direction:column;gap:2px;opacity:0.5}
-.dh span{display:block;width:8px;height:1.5px;background:#666;border-radius:1px}
-td:hover .dh,.dh:hover{display:flex;opacity:1}
+/* Drag handle — Excel fill handle style */
+.dh{width:8px;height:8px;background:#1a1a2e;border:1px solid #fff;position:absolute;right:-1px;bottom:-1px;cursor:crosshair;display:none;z-index:10;border-radius:0}
+td:hover .dh{display:block}
+.dh:hover{background:#F59E0B}
 .drag-target td{background:#fffbeb!important;outline:2px solid #F59E0B}
 .drag-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;cursor:ns-resize}
 
@@ -258,7 +258,7 @@ function confHTML(){
       '<td><span class="cell num">'+(prev?eu(prev):"—")+'</span></td>'+
       '<td><span class="cell num bold">'+(a.pc>0?eu(a.pc):'<span style="color:#9ca3af">sem preço</span>')+'</span></td>'+
       '<td><span class="cell num">'+(d!==null?'<span class="badge '+(d>0?"badge-R":"badge-G")+'">'+(d>0?"▲":"▼")+Math.abs(d).toFixed(1)+'%</span>':"—")+'</span></td>'+
-      '<td style="min-width:100px" onclick="startEdit(this,\'mk\',\''+a.a+'\')" title="Clica para editar"><div style="display:flex;align-items:center;gap:4px;padding:7px 10px"><span style="font-size:12px;color:#1a1a2e;font-variant-numeric:tabular-nums">'+mkP(a.mk)+'</span><span style="font-size:10px;color:#6b7280">%</span><div class="dh" data-type="mk"><span></span><span></span><span></span></div></div></td>'+
+      '<td style="min-width:100px" onclick="startEdit(this,\'mk\',\''+a.a+'\')" title="Clica para editar"><div style="display:flex;align-items:center;gap:4px;padding:7px 10px"><span style="font-size:12px;color:#1a1a2e;font-variant-numeric:tabular-nums">'+mkP(a.mk)+'</span><span style="font-size:10px;color:#6b7280">%</span><div class="dh" data-type="mk"></div></div></td>'+
       '<td><span class="cell num bold">'+(a.pc>0?eu(p):"—")+'</span></td>'+
       '<td><span class="cell num">'+(a.pc>0?'<span class="badge '+mBadge+'">'+pct(m)+'</span>':"—")+'</span></td>'+
       '<td><span class="cell num">'+(a.pc>0?eu(phC(p)):"—")+'</span></td>'+
@@ -323,7 +323,7 @@ function garrafHTML(){
       '<td><span class="cell num">'+eu(a.pc)+'</span></td>'+
       '<td><span class="cell num">'+eu(p)+'</span></td>'+
       '<td><span class="cell num" style="color:#9ca3af">'+eu(pgC(p))+'</span></td>'+
-      '<td style="min-width:100px" onclick="startEdit(this,\'mk5\',\''+a.a+'\')" title="Clica para editar"><div style="display:flex;align-items:center;gap:4px;padding:7px 10px"><span style="font-size:12px;color:#1a1a2e;font-variant-numeric:tabular-nums">'+mkP(a.mk5||0)+'</span><span style="font-size:10px;color:#6b7280">%</span><div class="dh" data-type="mk5"><span></span><span></span><span></span></div></div></td>'+
+      '<td style="min-width:100px" onclick="startEdit(this,\'mk5\',\''+a.a+'\')" title="Clica para editar"><div style="display:flex;align-items:center;gap:4px;padding:7px 10px"><span style="font-size:12px;color:#1a1a2e;font-variant-numeric:tabular-nums">'+mkP(a.mk5||0)+'</span><span style="font-size:10px;color:#6b7280">%</span><div class="dh" data-type="mk5"></div></div></td>'+
       '<td><span class="cell num purple">'+(pG>0?eu(pG):"—")+'</span></td>'+
       '<td><span class="cell num">'+(pG>0?'<span class="badge '+mBadge+'">'+pct(mgG)+'</span>':"—")+'</span></td>'+
       '</tr>';
